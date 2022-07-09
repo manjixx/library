@@ -200,4 +200,77 @@ Vue.config.productionTip = false
 - ```application.properties```文件配置端口，即加上```server.port=8443```
 
 
+# Vue + Spring Boot 项目实战（四）：数据库的引入
 
+## 一.引入数据库
+- 安装MySql
+
+- 使用 Navicat 创建数据库与表
+```mysql
+-- ----------------------------
+-- Table structure for user
+-- ----------------------------
+DROP TABLE IF EXISTS `user`;
+CREATE TABLE `user` (
+                      `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+                      `username` varchar(255) DEFAULT NULL,
+                      `password` varchar(255) DEFAULT NULL,
+                      PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8;
+
+-- ----------------------------
+-- Records of user
+-- ----------------------------
+INSERT INTO `user` VALUES ('1', 'admin', '123');
+
+```
+
+## 二.使用数据库验证登录
+
+- 修改pom.xml文件
+
+- 配置数据库
+```properties
+spring.datasource.url=jdbc:mysql://127.0.0.1:3306/library?characterEncoding=UTF-8
+spring.datasource.username=root
+spring.datasource.password=123456
+spring.datasource.driver-class-name=com.mysql.jdbc.Driver
+spring.jpa.hibernate.ddl-auto = none
+```
+
+- 修改User类
+ - @Entity 表示这是一个实体类
+ - @Table(name=“user”) 表示对应的表名是 user 
+   
+  - 为了简化对数据库的操作，我们使用了 Java Persistence API（JPA），对于 @JsonIgnoreProperties({ “handler”,“hibernateLazyInitializer” })，解释起来比较复杂，下面的话看不懂可以忽略：
+  > 因为是做前后端分离，而前后端数据交互用的是 json 格式。 那么 User 对象就会被转换为 json 数据。 
+  > 而本项目使用 jpa 来做实体类的持久化，jpa 默认会使用 hibernate, 在 jpa 工作过程中，就会创造代理类来继承 User ，
+  > 并添加 handler 和 hibernateLazyInitializer 这两个无须 json 化的属性，所以这里需要用 JsonIgnoreProperties 
+  > 把这两个属性忽略掉。
+
+- 创建UserDAO 
+  - Data Access Object（数据访问对象，DAO）即用来操作数据库的对象， 这个对象可以是我们自己开发的，也可以是框架提供的。这里我们通过继承 JpaRepository 的方式构建 DAO
+  
+- 创建UserService
+  - 新建```package```，命名为```service```，新建 ```Java Class```，命名为 ```UserService```
+  
+  这里实际上是对 UserDAO 进行了二次封装，一般来讲，我们在 DAO 中只定义基础的增删改查操作，
+  而具体的操作，需要由 Service 来完成。当然，由于我们做的操作原本就比较简单，
+  所以这里看起来只是简单地重命名了一下，比如把 “通过用户名及密码查询并获得对象” 这种方法命名为 get。
+
+- 修改LoginController
+
+```java
+User user = userService.get(username, requestUser.getPassword());
+        if (null == user) {
+            return new Result(400);
+        } else {
+            return new Result(200);
+        }
+```
+
+### 三. 简单的三层架构（DAO + Service + Controller）
+
+- DAO 用于与数据库的直接交互，定义增删改查等操作
+- Service 负责业务逻辑，跟功能相关的代码一般写在这里，编写、调用各种方法对 DAO 取得的数据进行操作 
+- Controller 负责数据交互，即接收前端发送的数据，通过调用 Service 获得处理后的数据并返回
